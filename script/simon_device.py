@@ -20,6 +20,7 @@ import time
 from datetime import datetime
 from functools import reduce
 import scipy.optimize as opt
+from tqdm.auto import tqdm
 
 SHAPES = ("CIRCLE", "SQUARE")
 LOCATIONS = ("LEFT", "RIGHT")
@@ -311,8 +312,7 @@ class SimonTask:
 
     #################### SETUP PARAMETER  ####################
     def get_parameters_name(self):
-        #param_names = ['seed', 'ans', 'le', 'mas', 'egs', 'alpha', 'imaginal-activation', 'motor-feature-prep-time']
-        param_names = ['seed', 'ans', 'le', 'mas', 'egs', 'alpha', 'imaginal-activation']
+        param_names = ['seed', 'ans', 'le', 'lf', 'mas', 'bll', 'egs', 'alpha', 'imaginal-activation', 'dat']
         return param_names
 
     def get_parameter(self, param_name):
@@ -368,7 +368,7 @@ class SimonTask:
         default parameter sets
         """
         defaul_parameters = self.get_parameters(*self.get_parameters_name())
-        defaul_other_parameters = {"motivation": 1, "init_cost": 0.05, "update_cost":False, "valid_cue_percentage":0.5, "n_trials":20}
+        defaul_other_parameters = {"motivation": 1, "init_cost": 0.05, "update_cost":False, "valid_cue_percentage":0.8, "n_trials":20}
         defaul_parameters.update(defaul_other_parameters)
         return defaul_parameters
 
@@ -976,10 +976,11 @@ def run_experiment(model="simon-motivation-model3",
     # Returns the task as a Python object for further analysis of data
     return task
 
-def run_simulation(model="simon-motivation-model3", param_set=None,
+def run_simulation(model="simon-motivation-model3",
+                   param_set=None,
                    n_simulation=1,
                    n_session=1,
-                   verbose=True,
+                   verbose=False,
                    log=False):
     """
     Run simulation for different parameters
@@ -989,50 +990,53 @@ def run_simulation(model="simon-motivation-model3", param_set=None,
         df_model, df_param = load_simulation(log)
         return df_model, df_param
     except:
-        dfs_model = []
-        dataframes_params = []
+        model_list = []
+        param_list = []
 
         # number of simulation per parameter sets
-        for j in range(n_simulation):
+        for j in tqdm(range(n_simulation)):
             if verbose: print("Epoch #%03d" % j)
 
             # number of sessions per experiment
-            dffs_model = []
-            # dffs_trace = []
+            list_session_i = []
+            list_session_i_param = []
             for i in range(n_session):
                 if verbose: print("\tSession #%03d" % i)
-                session = run_experiment(model,
+                session_i = run_experiment(model,
                                          reload=(not i),
                                          visible=False,
-                                         verbose=True,
+                                         verbose=verbose,
                                          trace=False,
                                          param_set=param_set)
-                session_model=session.df_stats_model_outputs()
+                df_session_i = session_i.df_stats_model_outputs()
 
                 # log parameter file
-                session_params = pd.Series(session.parameters)
-                # session_params['file_suffix'] = str(time_suffix)
-                session_params['session'] = i+1
+                session_i_param = pd.Series(session_i.parameters)
+                session_i_param['session'] = i+1
 
                 # log session index
-                session_model.insert(0, "session", i+1)
+                df_session_i.insert(0, "session", i+1)
 
-                dffs_model.append(session_model)
-                dataframes_params.append(session_params)
+                list_session_i.append(df_session_i)
+                list_session_i_param.append(session_i_param)
 
-            simulation_model = pd.concat(dffs_model, axis=0)
+            df_epoch_j = pd.concat(list_session_i, axis=0)
+            df_epoch_j_param = pd.DataFrame(list_session_i_param)
 
             # log simulation index
-            simulation_model.insert(0, "epoch", j+1)
+            df_epoch_j.insert(0, "epoch", j+1)
 
             # append all sessions
-            dfs_model.append(simulation_model)
+            model_list.append(df_epoch_j)
+            param_list.append(df_epoch_j_param)
 
-        df_model = pd.concat(dfs_model, axis=0)
-        df_param = pd.DataFrame(dataframes_params)
-        if log:
-            save_simulation(dir_name=log, df_model=df_model, df_param=df_param)
+            # log
+            if log:
+                save_simulation(dir_name=log, df_model=df_epoch_j, df_param=df_epoch_j_param)
 
+
+        df_model = pd.concat(model_list, axis=0)
+        df_param = pd.concat(param_list, axis=0)
         return df_model, df_param
 
 def save_simulation(dir_name, df_model, df_param):
@@ -1043,9 +1047,18 @@ def save_simulation(dir_name, df_model, df_param):
     data_dir = os.path.join(os.path.realpath(".."), "data", dir_name + datetime.now().strftime("%y%m%d"))
     if not os.path.exists(data_dir):
         os.mkdir(data_dir)
-    df_model.to_csv(os.path.join(data_dir , "model_output.csv"), index=False)
-    no_parameter_log = not os.path.exists(os.path.join(data_dir, "log.csv"))
-    df_param.to_csv(os.path.join(data_dir, "log.csv"), mode='a', index=False, header=no_parameter_log)
+
+    if os.path.exists(os.path.join(data_dir, "model_output.csv")):
+        mode, header = 'a', False
+    else:
+        mode, header = 'w', True
+    df_model.to_csv(os.path.join(data_dir , "model_output.csv"), index=False,  mode=mode, header=header)
+
+    if os.path.exists(os.path.join(data_dir, "log.csv")):
+        mode, header = 'a', False
+    else:
+        mode, header = 'w', True
+    df_param.to_csv(os.path.join(data_dir, "log.csv"), index=False,  mode=mode, header=header)
 
 def load_simulation(dir_name):
     """
