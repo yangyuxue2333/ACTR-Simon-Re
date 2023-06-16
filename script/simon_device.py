@@ -9,7 +9,7 @@
 ## The Simon task is modeled after Andrea Stocco's (2016)          ##
 ## paper on the Simon task.                           ##
 ## ================================================================ ##
-
+import glob
 import os
 import actr
 import random
@@ -1071,15 +1071,14 @@ def load_simulation(dir_name):
     """
     Load Simulation data
     """
-
-    data_dir = os.path.join(os.path.realpath(".."), "data", dir_name + datetime.now().strftime("%y%m%d"))
-    if not os.path.exists(data_dir):
-        print("...WRONG PATH...")
+    try:
+        data_dir = glob.glob(os.path.join(os.path.realpath(".."), "data", dir_name + "*"))
+        df_model = pd.concat([pd.read_csv(os.path.join(d, "model_output.csv")) for d in data_dir], axis=0)
+        df_param = pd.concat([pd.read_csv(os.path.join(d, "log.csv")) for d in data_dir], axis=0)
+        print("......>>> LOAD SIMULATION DATA <<<......\n[%s]" % [d.split('/')[-1] for d in data_dir])
+        return df_model, df_param
+    except:
         raise ValueError
-    df_model = pd.read_csv(os.path.join(data_dir, "model_output.csv"))
-    df_param = pd.read_csv(os.path.join(data_dir, "log.csv"))
-    print("......>>> LOAD SIMULATION DATA <<<......")
-    return df_model, df_param
 
 '''
 def run_simulation(model="simon-motivation-model3", param_set=None, n_simulation=1, n_session=1, verbose=True, log=True, special_suffix=""):
