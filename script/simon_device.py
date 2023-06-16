@@ -285,9 +285,10 @@ class SimonTask:
         # add commands
         self.add_actr_commands()
 
-
         # load model-core.lisp
         if reload:
+            SimonTask.reset_trial_id()
+
             # schedule event of detect production/reward before loading model
             # note: if not load, no need to shceulde it again
             actr.schedule_event_now("detect-production-hook")
@@ -304,6 +305,9 @@ class SimonTask:
         # load new parameter sets
         self.parameters = self.get_default_parameters()
         self.set_parameters(param_set)
+
+        # init cost
+        self.curr_cost = self.cost_function(init_cost=self.parameters["init_cost"])
 
         if verbose:
             print("######### SETUP MODEL " + model + " #########")
@@ -578,6 +582,7 @@ class SimonTask:
             #print('self.current_trial.offset', self.current_trial.offset)
 
             self.index += 1
+            SimonTask.increment_trial_id()  # increment one trial
             self.log.append(self.current_trial)
             if self.index >= len(self.stimuli):
                 self.phase = "done"
@@ -723,36 +728,38 @@ class SimonTask:
     #         cost = thresh
     #     return cost
 
-    def cost_function(self, init_cost, a=1e-3, b=0.05, thresh = 0.5):
+    def cost_function(self, init_cost=0.05, a=0.005, b=0.005):
         """
-        This function will not change shape based on init_cost
-        init_cost only shifts the curve up and down
-        Exponential function of cost increase as time x = (0-500) y = (0-0.5)
-        b * exp(a*x) -b
-
-        a -> control slop
-        b -> control y shift
+        Updated on 6/15/2023
+        y =
         """
-        cost = np.round((b * np.exp(a * actr.mp_time()) - b + init_cost), 2)
-        if cost > thresh:
-            cost = thresh
-        return cost
-
-    # def cost_function_derivitive(self, a=0.005, b=0.05):
-    #     return np.round((b * b * np.exp(a * actr.mp_time())), 2)
+        return np.round(init_cost - a * (1 - np.exp(b * SimonTask.get_trial_id())), 2)
 
     def update_cost(self):
         """
         Update :dat for all productions as time increases
         """
-
         if self.parameters["update_cost"]: # Turn on update cost
-            actr.hide_output()
-            curr_cost = actr.spp(":at")[0][0]
+            old_cost = self.curr_cost
             new_cost = self.cost_function(init_cost=self.parameters["init_cost"])
-            if new_cost > curr_cost:
+            if new_cost > old_cost:
+                actr.hide_output()
                 actr.spp(":at", new_cost)
-            actr.hide_output()
+                actr.hide_output()
+                self.curr_cost = new_cost
+
+    @classmethod
+    def increment_trial_id(cls):
+        cls.trial_id += 1
+
+    @classmethod
+    def reset_trial_id(cls):
+        cls.trial_id = 0
+
+    @classmethod
+    def get_trial_id(cls):
+        return cls.trial_id
+
 
     #################### ACTR STATS ANALYSIS ####################
     '''
@@ -954,7 +961,7 @@ def run_experiment(model="simon-motivation-model3",
 
     # Everytime ACT-R is reloaded, all parameters are set to init
     # Load model and add ACT-R commands
-    task.setup_model(model, param_set, reload, verbose)
+    task.setup_model(model=model, param_set=param_set, reload=reload, verbose=verbose)
 
     #print("TEST: in run_experiment()", task.parameters)
     win = actr.open_exp_window("* SIMON TASK *", width=800, height=600, visible=visible)
