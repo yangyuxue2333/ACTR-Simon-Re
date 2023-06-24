@@ -988,13 +988,14 @@ def run_simulation(model="simon-motivation-model3",
                    n_simulation=1,
                    n_session=1,
                    verbose=False,
-                   log=False):
+                   log=False,
+                   log_append=False):
     """
     Run simulation for different parameters
 
     """
     try:
-        df_model, df_param = load_simulation(log)
+        df_model, df_param = load_simulation(log=log, log_append=log_append)
         return df_model, df_param
     except:
         model_list = []
@@ -1067,12 +1068,14 @@ def save_simulation(dir_name, df_model, df_param):
         mode, header = 'w', True
     df_param.to_csv(os.path.join(data_dir, "log.csv"), index=False,  mode=mode, header=header)
 
-def load_simulation(dir_name):
+def load_simulation(log, log_append=False):
     """
     Load Simulation data
     """
+    if log_append:
+        raise ValueError
     try:
-        data_dir = glob.glob(os.path.join(os.path.realpath(".."), "data", dir_name + "*"))
+        data_dir = glob.glob(os.path.join(os.path.realpath(".."), "data", log + "*"))
         df_model = pd.concat([pd.read_csv(os.path.join(d, "model_output.csv")) for d in data_dir], axis=0)
         df_param = pd.concat([pd.read_csv(os.path.join(d, "log.csv")) for d in data_dir], axis=0)
         print("......>>> LOAD SIMULATION DATA <<<......\n[%s]" % [d.split('/')[-1] for d in data_dir])
