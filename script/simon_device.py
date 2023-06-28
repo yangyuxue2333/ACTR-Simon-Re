@@ -989,15 +989,15 @@ def run_simulation(model="simon-motivation-model3",
                    n_session=1,
                    verbose=False,
                    log=False,
-                   log_append=False):
+                   load=False):
     """
     Run simulation for different parameters
 
     """
-    try:
-        df_model, df_param = load_simulation(log=log, log_append=log_append)
+    if load:
+        df_model, df_param = load_simulation(log=log)
         return df_model, df_param
-    except:
+    else:
         model_list = []
         param_list = []
 
@@ -1068,12 +1068,10 @@ def save_simulation(dir_name, df_model, df_param):
         mode, header = 'w', True
     df_param.to_csv(os.path.join(data_dir, "log.csv"), index=False,  mode=mode, header=header)
 
-def load_simulation(log, log_append=False):
+def load_simulation(log):
     """
     Load Simulation data
     """
-    if log_append:
-        raise ValueError
     try:
         data_dir = glob.glob(os.path.join(os.path.realpath(".."), "data", log + "*"))
         df_model = pd.concat([pd.read_csv(os.path.join(d, "model_output.csv")) for d in data_dir], axis=0)
